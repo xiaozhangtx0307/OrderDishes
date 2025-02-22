@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>每日点菜</title>
+    <style>
+        /* 通用样式 */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2em;
+            color: #28a745;
+        }
+
+        .menu-section {
+            margin-bottom: 20px;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        li {
+            padding: 10px;
+            background-color: #f9f9f9;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            animation: fadeIn 0.5s ease-in-out; /* 添加动画效果 */
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .preset-menu-container {
+            max-height: 200px; /* 限制高度 */
+            overflow-y: auto; /* 允许垂直滚动 */
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            background-color: #28a745;
+            color: #fff;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        .result {
+            margin-top: 20px;
+        }
+
+        #selected-dish {
+            font-size: 1.5em;
+            color: #dc3545;
+            font-weight: bold;
+            animation: bounce 0.5s ease-in-out; /* 添加动画效果 */
+        }
+
+        @keyframes bounce {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        .menu-item {
+            flex: 1;
+            text-align: center; /* 菜品名称居中 */
+        }
+
+        .menu-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .menu-actions button {
+            background: none;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-size: 0.9em;
+            padding: 0;
+            transition: color 0.3s ease;
+        }
+
+        .menu-actions button:hover {
+            color: #333;
+        }
+
+        .menu-actions .edit-btn:hover {
+            color: #28a745;
+        }
+
+        .menu-actions .delete-btn:hover {
+            color: #dc3545;
+        }
+
+        /* 移动端优化 */
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.5em;
+            }
+
+            li {
+                font-size: 1em;
+            }
+
+            button {
+                padding: 8px 16px;
+                font-size: 0.9em;
+            }
+
+            #selected-dish {
+                font-size: 1.2em;
+            }
+        }
+
+        /* 平板设备优化 */
+        @media (min-width: 601px) and (max-width: 1024px) {
+            .container {
+                max-width: 700px;
+            }
+
+            h1 {
+                font-size: 2.2em;
+            }
+
+            li {
+                font-size: 1.1em;
+            }
+
+            button {
+                font-size: 1.1em;
+            }
+
+            #selected-dish {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>今天要吃啥呢？</h1>
+        <div class="menu-section">
+            <h2>预设菜单</h2>
+            <div class="preset-menu-container">
+                <ul id="preset-menu">
+                    <!-- 预设菜单会通过JavaScript动态加载 -->
+                </ul>
+            </div>
+        </div>
+        <div class="menu-section">
+            <h2>上传本地菜单</h2>
+            <input type="file" id="upload-menu" accept=".txt">
+        </div>
+        <div class="controls">
+            <button id="start-btn">开始</button>
+            <button id="stop-btn">停止</button>
+        </div>
+        <div class="result">
+            <h2>就决定是你啦！</h2>
+            <p id="selected-dish"></p>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const presetMenu = document.getElementById('preset-menu');
+            const uploadMenu = document.getElementById('upload-menu');
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const selectedDish = document.getElementById('selected-dish');
+
+            let menuItems = [];
+            let intervalId = null; // 用于存储定时器ID
+
+            // 加载预设菜单
+            function loadPresetMenu() {
+                const savedMenu = localStorage.getItem('presetMenu');
+                if (savedMenu) {
+                    menuItems = savedMenu.split('\n');
+                } else {
+                    // 默认预设菜单
+                    menuItems = [
+                        "红烧猪蹄",
+                        "可乐鸡翅",
+                        "红烧鸡翅",
+                        "清蒸鲈鱼",
+                        "青椒炒肉"
+                    ];
+                }
+                updatePresetMenuDisplay();
+            }
+
+            // 更新预设菜单显示
+            function updatePresetMenuDisplay() {
+                presetMenu.innerHTML = '';
+                menuItems.forEach((item, index) => {
+                    if (item.trim()) {
+                        const li = document.createElement('li');
+                        li.innerHTML = `
+                            <div class="menu-item">${item.trim()}</div>
+                            <div class="menu-actions">
+                                <button class="edit-btn" onclick="editItem(${index})">✏️</button>
+                                <button class="delete-btn" onclick="deleteItem(${index})">🗑️</button>
+                            </div>
+                        `;
+                        presetMenu.appendChild(li);
+                    }
+                });
+            }
+
+            // 编辑菜品
+            window.editItem = function (index) {
+                const newItem = prompt('请输入新的菜品名称：', menuItems[index]);
+                if (newItem && newItem.trim()) {
+                    menuItems[index] = newItem.trim();
+                    localStorage.setItem('presetMenu', menuItems.join('\n'));
+                    updatePresetMenuDisplay();
+                }
+            };
+
+            // 删除菜品
+            window.deleteItem = function (index) {
+                if (confirm('确定删除该菜品吗？')) {
+                    menuItems.splice(index, 1);
+                    localStorage.setItem('presetMenu', menuItems.join('\n'));
+                    updatePresetMenuDisplay();
+                }
+            };
+
+            // 上传本地菜单
+            uploadMenu.addEventListener('change', function (event) {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        const items = e.target.result.split('\n');
+                        menuItems = items.filter(item => item.trim()); // 过滤空行
+                        // 保存到本地存储
+                        localStorage.setItem('presetMenu', menuItems.join('\n'));
+                        // 更新显示
+                        updatePresetMenuDisplay();
+                        // 滚动到预设菜单部分
+                        document.querySelector('.preset-menu-container').scrollIntoView({ behavior: 'smooth' });
+                    };
+                    reader.readAsText(file);
+                }
+            });
+
+            // 开始滚动
+            startBtn.addEventListener('click', function () {
+                if (intervalId) return; // 如果已经有定时器在运行，则不再启动新的定时器
+
+                if (menuItems.length > 0) {
+                    intervalId = setInterval(() => {
+                        const randomIndex = Math.floor(Math.random() * menuItems.length);
+                        selectedDish.textContent = menuItems[randomIndex];
+                        selectedDish.style.animation = 'bounce 0.5s ease-in-out'; // 添加动画效果
+                    }, 100);
+                }
+            });
+
+            // 停止滚动
+            stopBtn.addEventListener('click', function () {
+                if (intervalId) {
+                    clearInterval(intervalId);
+                    intervalId = null; // 清除定时器ID
+                }
+            });
+
+            // 初始化
+            loadPresetMenu();
+        });
+    </script>
+</body>
+</html>
